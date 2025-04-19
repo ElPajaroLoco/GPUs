@@ -3,7 +3,7 @@
 #include <time.h>
 #include <math.h>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "kernels.hpp"
 
 #include <sys/time.h>

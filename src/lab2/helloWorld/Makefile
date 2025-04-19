@@ -1,5 +1,5 @@
-CXX=icpx
-CXXFLAGS=-fsycl -I.
+CXX=icpx -fsycl -fsycl-targets=nvptx64-nvidia-cuda 
+CXXFLAGS= -I.
 LIBS=
 
 %.o: %.cpp $(DEPS)
