@@ -19,6 +19,7 @@
  */
 
 #include <iostream>
+#include <sycl/sycl.hpp>
 
 #include "GSimulation.hpp"
 
@@ -27,20 +28,39 @@ int main(int argc, char** argv)
   int N;			//number of particles
   int nstep; 		//number ot integration steps
   
+  	// Select device
+	sycl::device dev;
+
+	if (argv[2][0]=='h')
+		dev = sycl::device(sycl::cpu_selector_v);
+	else if (argv[2][0]=='c')
+		dev = sycl::device(sycl::cpu_selector_v);
+	else if (argv[2][0]=='g')
+		dev = sycl::device(sycl::gpu_selector_v);
+
+  sycl::queue Q(dev);
+  std::cout << "Running on "
+    << Q.get_device().get_info<sycl::info::device::name>()
+    << std::endl;
+
   GSimulation sim;
     
   if(argc>1)
   {
-    N=atoi(argv[1]);
-    sim.set_number_of_particles(N);  
-    if(argc==3) 
-    {
-      nstep=atoi(argv[2]);
-      sim.set_number_of_steps(nstep);  
-    }
+    //N=atoi(argv[1]);
+    //sim.set_number_of_particles(N);  
+    //if(argc==3) 
+    //{
+    //  nstep=atoi(argv[2]);
+    //  sim.set_number_of_steps(nstep);  
+    //}
+  }
+  else {
+    fprintf(stderr, "Uso incorrecto de los parametros. ./nobody.x [numParticles] [hcg]\n");
+		exit(1);
   }
   
-  sim.start();
+  sim.start(Q);
 
   return 0;
 }

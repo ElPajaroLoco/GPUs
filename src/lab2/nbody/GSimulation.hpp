@@ -28,6 +28,7 @@
 #include <string>
 #include <sstream>
 #include <stdlib.h>
+#include <sycl/sycl.hpp>
 
 #include "Particle.hpp"
 
@@ -40,7 +41,7 @@ public:
   void init();
   void set_number_of_particles(int N);
   void set_number_of_steps(int N);
-  void start();
+  void start(sycl::queue Q);
   
 private:
   ParticleAoS *particles;
@@ -61,8 +62,8 @@ private:
   void init_acc();
   void init_mass();
 
-  void get_acceleration(int n);
-  real_type updateParticles(int n, real_type dt);
+  void get_acceleration(sycl::queue Q, int n, ParticleAoS *ptcs);
+  real_type updateParticles(sycl::queue Q, const int n, real_type dt, ParticleAoS *ptcs, real_type *energy);
     
   inline void set_npart(const int &N){ _npart = N; }
   inline int get_npart() const {return _npart; }

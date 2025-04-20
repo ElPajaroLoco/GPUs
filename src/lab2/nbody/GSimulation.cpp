@@ -21,6 +21,8 @@
 #include "GSimulation.hpp"
 #include "cpu_time.hpp"
 
+#include <sycl/sycl.hpp>
+
 GSimulation :: GSimulation()
 {
   std::cout << "===============================" << std::endl;
@@ -92,69 +94,115 @@ void GSimulation :: init_mass()
   }
 }
 
-void GSimulation :: get_acceleration(int n)
+void GSimulation :: get_acceleration(sycl::queue Q, int n, ParticleAoS *ptcs)
 {
-   int i,j;
+  const float softeningSquared = 1e-3f;
+  const float G = 6.67259e-11f;
 
-   const float softeningSquared = 1e-3f;
-   const float G = 6.67259e-11f;
+  const int TILE_SIZE = 64;
+  size_t size = n;
 
-   for (i = 0; i < n; i++)// update acceleration
-   {
-     real_type ax_i = particles[i].acc[0];
-     real_type ay_i = particles[i].acc[1];
-     real_type az_i = particles[i].acc[2];
-     for (j = 0; j < n; j++)
-     {
-         real_type dx, dy, dz;
-	 real_type distanceSqr = 0.0f;
-	 real_type distanceInv = 0.0f;
-		  
-	 dx = particles[j].pos[0] - particles[i].pos[0];	//1flop
-	 dy = particles[j].pos[1] - particles[i].pos[1];	//1flop	
-	 dz = particles[j].pos[2] - particles[i].pos[2];	//1flop
-	
- 	 distanceSqr = dx*dx + dy*dy + dz*dz + softeningSquared;	//6flops
- 	 distanceInv = 1.0f / sqrtf(distanceSqr);			//1div+1sqrt
+  auto global_range = sycl::nd_range<1>(
+    {(size + TILE_SIZE - 1) / TILE_SIZE * TILE_SIZE},
+    {TILE_SIZE});
 
-	 ax_i += dx * G * particles[j].mass * distanceInv * distanceInv * distanceInv; //6flops
-	 ay_i += dy * G * particles[j].mass * distanceInv * distanceInv * distanceInv; //6flops
-	 az_i += dz * G * particles[j].mass * distanceInv * distanceInv * distanceInv; //6flops
-     }
-     particles[i].acc[0] = ax_i;
-     particles[i].acc[1] = ay_i;
-     particles[i].acc[2] = az_i;
-   }
+    Q.submit([&](sycl::handler &h) { 
+
+      auto local = sycl::local_accessor<ParticleAoS, 1>(TILE_SIZE, h);
+
+      h.parallel_for(global_range, [=](sycl::nd_item<1> item) {
+        const int lid_x = item.get_local_id(0);
+        const int gid_x = item.get_global_id(0);
+        if (gid_x >= n) return;
+
+        real_type ax = 0.0f, ay = 0.0f, az = 0.0f;
+        const real_type xi = ptcs[gid_x].pos[0];
+        const real_type yi = ptcs[gid_x].pos[1];
+        const real_type zi = ptcs[gid_x].pos[2];
+
+        for (int tile_base = 0; tile_base < n; tile_base += TILE_SIZE) {
+            int tile_idx = tile_base + lid_x;
+            if (tile_idx < n) local[lid_x] = ptcs[tile_idx];
+            item.barrier(sycl::access::fence_space::local_space);
+
+            int tile_limit = sycl::min(TILE_SIZE, n - tile_base);
+            for (int k = 0; k < tile_limit; ++k) {
+                ParticleAoS pj = local[k];
+                
+                real_type dx = pj.pos[0] - xi;
+                real_type dy = pj.pos[1] - yi;
+                real_type dz = pj.pos[2] - zi;
+
+                real_type dist_sqr = dx*dx + dy*dy + dz*dz + softeningSquared;
+                real_type inv_dist = sycl::rsqrt(dist_sqr);
+                real_type inv_dist_cube = inv_dist * inv_dist * inv_dist;
+                real_type force = G * pj.mass * inv_dist_cube;
+
+                ax += dx * force;
+                ay += dy * force;
+                az += dz * force;
+            }
+            item.barrier(sycl::access::fence_space::local_space);
+        }
+
+        ptcs[gid_x].acc[0] = ax;
+        ptcs[gid_x].acc[1] = ay;
+        ptcs[gid_x].acc[2] = az;
+    });
+    }).wait();
 }
 
-real_type GSimulation :: updateParticles(int n, real_type dt)
+real_type GSimulation :: updateParticles(sycl::queue Q, const int n, real_type dt, ParticleAoS *ptcs, real_type *energy)
 {
-   int i;
-   real_type energy = 0;
+  int i;
+  *energy = 0;
 
-   for (i = 0; i < n; ++i)// update position
-   {
-     particles[i].vel[0] += particles[i].acc[0] * dt; //2flops
-     particles[i].vel[1] += particles[i].acc[1] * dt; //2flops
-     particles[i].vel[2] += particles[i].acc[2] * dt; //2flops
-	  
-     particles[i].pos[0] += particles[i].vel[0] * dt; //2flops
-     particles[i].pos[1] += particles[i].vel[1] * dt; //2flops
-     particles[i].pos[2] += particles[i].vel[2] * dt; //2flops
+  const int TILE_SIZE = 64;
+  size_t size = n;
 
-     particles[i].acc[0] = 0.;
-     particles[i].acc[1] = 0.;
-     particles[i].acc[2] = 0.;
-	
-     energy += particles[i].mass * (
-	      particles[i].vel[0]*particles[i].vel[0] + 
-               particles[i].vel[1]*particles[i].vel[1] +
-               particles[i].vel[2]*particles[i].vel[2]); //7flops
-   }
-   return energy;
+  auto reduction_energy = sycl::reduction(energy, sycl::plus<>());
+
+  auto global_range = sycl::nd_range<1>(
+  {(size + TILE_SIZE - 1) / TILE_SIZE * TILE_SIZE},
+  {TILE_SIZE});
+
+  Q.submit([&](sycl::handler &h) { 
+
+    auto local = sycl::local_accessor<ParticleAoS, 1>(TILE_SIZE, h);
+
+    h.parallel_for(global_range, reduction_energy, [=](sycl::nd_item<1> item, auto &energy_sum) {
+      const int lid_x = item.get_local_id(0);
+      const int gid_x = item.get_global_id(0);
+
+      if (gid_x >= size) return;
+
+      local[lid_x] = ptcs[gid_x];
+
+      local[lid_x].vel[0] += local[lid_x].acc[0] * dt; //2flops
+      local[lid_x].vel[1] += local[lid_x].acc[1] * dt; //2flops
+      local[lid_x].vel[2] += local[lid_x].acc[2] * dt; //2flops
+     
+      local[lid_x].pos[0] += local[lid_x].vel[0] * dt; //2flops
+      local[lid_x].pos[1] += local[lid_x].vel[1] * dt; //2flops
+      local[lid_x].pos[2] += local[lid_x].vel[2] * dt; //2flops
+ 
+      local[lid_x].acc[0] = 0.;
+      local[lid_x].acc[1] = 0.;
+      local[lid_x].acc[2] = 0.;
+   
+      energy_sum += local[lid_x].mass * (
+        local[lid_x].vel[0]*local[lid_x].vel[0] + 
+        local[lid_x].vel[1]*local[lid_x].vel[1] +
+        local[lid_x].vel[2]*local[lid_x].vel[2]); //7flops
+
+      ptcs[gid_x] = local[lid_x];
+    });
+  }).wait();
+
+  return *energy;
 }
 
-void GSimulation :: start() 
+void GSimulation :: start(sycl::queue Q) 
 {
   real_type energy;
   real_type dt = get_tstep();
@@ -181,18 +229,32 @@ void GSimulation :: start()
   double av=0.0, dev=0.0;
   int nf = 0;
   
+  ParticleAoS *ptcs = sycl::malloc_shared<ParticleAoS>(n, Q);
+  real_type *energy_usm = sycl::malloc_shared<real_type>(1, Q);
+
   const double t0 = time.start();
   for (int s=1; s<=get_nsteps(); ++s)
   {   
-   ts0 += time.start(); 
+    
+    *energy_usm = 0;
+    
+    ts0 += time.start(); 
+    for (int i = 0; i < n; ++i) {
+      ptcs[i] = particles[i];
+    }
+
+    get_acceleration(Q, n, ptcs);
 
 
-    get_acceleration(n);
-
-    energy = updateParticles(n, dt);
+    energy = updateParticles(Q, n, dt, ptcs, energy_usm);
     _kenergy = 0.5 * energy; 
     
+    for (int i = 0; i < n; ++i) {
+      particles[i] = ptcs[i];
+    }
     ts1 += time.stop();
+
+
     if(!(s%get_sfreq()) ) 
     {
       nf += 1;      
@@ -214,6 +276,8 @@ void GSimulation :: start()
     }
   
   } //end of the time step loop
+
+  sycl::free(ptcs, Q);
   
   const double t1 = time.stop();
   _totTime  = (t1-t0);
@@ -255,3 +319,27 @@ GSimulation :: ~GSimulation()
 {
   delete particles;
 }
+
+
+/*
+===============================
+ Initialize Gravity Simulation
+ nPart = 16000; nSteps = 10; dt = 0.1
+------------------------------------------------
+ s       dt      kenergy     time (s)    GFlops      
+------------------------------------------------
+ 1       0.1     26.405      0.34402     21.581      
+ 2       0.2     313.77      0.34162     21.733      
+ 3       0.3     926.56      0.34612     21.45       
+ 4       0.4     1866.4      0.34455     21.548      
+ 5       0.5     3135.6      0.34512     21.512      
+ 6       0.6     4737.6      0.35076     21.166      
+ 7       0.7     6676.6      0.35515     20.905      
+ 8       0.8     8957.7      0.34663     21.419      
+ 9       0.9     11587       0.34767     21.355      
+ 10      1       14572       0.34054     21.802      
+
+# Total Time (s)      : 3.4626
+# Average Performance : 21.395 +- 0.25001
+
+*/
