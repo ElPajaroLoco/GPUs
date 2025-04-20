@@ -1,7 +1,7 @@
 
-CXX = icpx
+CXX = icpx -fsycl -fsycl-targets=nvptx64-nvidia-cuda
 
-CXXFLAGS=-fsycl -O3
+CXXFLAGS= -O3
 
 LIBS=
 

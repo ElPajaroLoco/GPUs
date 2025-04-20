@@ -1,0 +1,22 @@
+Running debugger environment checks on adrian-ROG-Zephyrus-G16-GA605WI-GA605WI with script version 0.5.0 at 2025-04-20 12:49:51
+Check Name         | Description                              | Result Status | Details
+------------------ | ---------------------------------------- | ------------- | --------------------------------
+Multi-GPU Support  | Checking multi-GPU support               | PASS          |                               
+Level-Zero Version | Checking level-zero version              | FAIL          | No compatible Level-Zero version found. Ensure Intel(R) oneAPI Toolkit is installed and 'sycl-ls' command is available
+Kernel Version     | Checking Linux kernel version            | PASS          | Version: 6.11.0-24-generic    
+Debugger Check     | Checking for Debugger in GDB directory   | PASS          | Version: 15.2                 
+libipt Check       | Checking for libipt in GDB directory     | PASS          | Version: 2.1.1                
+libiga Check       | Checking for libiga in GDB directory     | PASS          | Version:                      
+Compiler Check     | Checking Intel(R) oneAPI Compiler        | PASS          | Version: (2025.1.0.20250317)  
+i915 Debug Check   | Checking i915 debug status               | FAIL          | No devices found that support debugging of GPU offload code. Ensure your system has compatible GPU devices
+GDB Env Variables  | Checking GDB environment variables       | FAIL          | ZET_ENABLE_PROGRAM_DEBUGGING=1 not set
+gdb-oneapi Check   | Checking gdb-oneapi processes            | PASS          |                               
+gdbserver-ze Check | Checking gdbserver-ze processes          | PASS          |                               
+Debugger environment checks completed
+Summary of checks:
+Total checks: 11
+Passed checks: 8
+Failed checks: 3
+Warning checks: 0
+Text report: debugger_check_adrian-ROG-Zephyrus-G16-GA605WI-GA605WI_2025-04-20_12-49-51_142_verbose.log
+
