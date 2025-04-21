@@ -1,0 +1,34 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        },
+        {
+            "name": "Linux (SYCL + CUDA)",
+            "includePath": [
+                "/opt/intel/oneapi/compiler/2025.1/include/sycl",  // SYCL headers
+                "/opt/intel/oneapi/compiler/2025.1/include",      // Standard headers
+                "/usr/local/cuda/include",                              // CUDA headers (if needed)
+                "${workspaceFolder}/**"                                 // Project headers
+            ],
+            "defines": [
+                "__SYCL_ENABLE_FLOAT_ATOMICS__",  // Optional: Enable SYCL float atomics
+                "SYCL_TARGET_NVPTX64_NVIDIA_CUDA" // Required for CUDA offload
+            ],
+            "compilerPath": "/opt/intel/oneapi/compiler/2025.1/bin/dpcpp",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-clang-x64",  // Matches DPC++ (Clang-based)
+            "configurationProvider": "ms-vscode.cpptools"
+        }
+    ],
+    "version": 4
+}

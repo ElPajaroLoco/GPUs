@@ -44,7 +44,7 @@ public:
   void start(sycl::queue Q);
   
 private:
-  ParticleAoS *particles;
+  ParticleSoA *particles;
   
   int       _npart;		//number of particles
   int	    _nsteps;		//number of integration steps
@@ -62,8 +62,8 @@ private:
   void init_acc();
   void init_mass();
 
-  void get_acceleration(sycl::queue Q, int n, ParticleAoS *ptcs);
-  real_type updateParticles(sycl::queue Q, const int n, real_type dt, ParticleAoS *ptcs, real_type *energy);
+  void get_acceleration(sycl::queue Q, int n, ParticleSoA*ptcs);
+  real_type updateParticles(sycl::queue Q, const int n, real_type dt, ParticleSoA *ptcs, real_type *energy);
     
   inline void set_npart(const int &N){ _npart = N; }
   inline int get_npart() const {return _npart; }

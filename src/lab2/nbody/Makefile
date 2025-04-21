@@ -1,5 +1,5 @@
 CXX = icpx
-COMPFLAGS = -fsycl -fsycl-targets=nvptx64-nvidia-cuda
+COMPFLAGS = -fsycl -fsycl-targets=nvptx64-nvidia-cuda #Comentar si queremos ejecutar en CPU
 OPTFLAGS = -O2
 INCLUDES = 
 LIBS=-L/usr/lib/gcc/x86_64-linux-gnu/11

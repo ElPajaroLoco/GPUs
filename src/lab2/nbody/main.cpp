@@ -31,34 +31,56 @@ int main(int argc, char** argv)
   	// Select device
 	sycl::device dev;
 
-	if (argv[2][0]=='h')
-		dev = sycl::device(sycl::cpu_selector_v);
-	else if (argv[2][0]=='c')
-		dev = sycl::device(sycl::cpu_selector_v);
-	else if (argv[2][0]=='g')
-		dev = sycl::device(sycl::gpu_selector_v);
+  GSimulation sim;
+
+  
+  switch (argc)
+  {
+    case 2:
+      if (argv[1][0]=='h')
+      dev = sycl::device(sycl::cpu_selector_v);
+      else if (argv[1][0]=='c')
+        dev = sycl::device(sycl::cpu_selector_v);
+      else if (argv[1][0]=='g')
+        dev = sycl::device(sycl::gpu_selector_v);
+
+      break;
+
+    case 3:
+    N=atoi(argv[1]);
+    sim.set_number_of_particles(N);  
+
+    if (argv[2][0]=='h')
+    dev = sycl::device(sycl::cpu_selector_v);
+    else if (argv[2][0]=='c')
+      dev = sycl::device(sycl::cpu_selector_v);
+    else if (argv[2][0]=='g')
+      dev = sycl::device(sycl::gpu_selector_v);
+    break;
+    case 4:
+      N=atoi(argv[1]);
+      sim.set_number_of_particles(N);
+
+      nstep=atoi(argv[2]);
+      sim.set_number_of_steps(nstep);  
+
+      if (argv[3][0]=='h')
+      dev = sycl::device(sycl::cpu_selector_v);
+      else if (argv[3][0]=='c')
+        dev = sycl::device(sycl::cpu_selector_v);
+      else if (argv[3][0]=='g')
+        dev = sycl::device(sycl::gpu_selector_v);
+    break;
+    default:
+      fprintf(stderr, "Uso incorrecto de los parametros. ./nobody.x [numParticles](opcional) [numSteps](opcional) [hcg]\n");
+      exit(1);
+      break;
+  }
 
   sycl::queue Q(dev);
   std::cout << "Running on "
     << Q.get_device().get_info<sycl::info::device::name>()
     << std::endl;
-
-  GSimulation sim;
-    
-  if(argc>1)
-  {
-    //N=atoi(argv[1]);
-    //sim.set_number_of_particles(N);  
-    //if(argc==3) 
-    //{
-    //  nstep=atoi(argv[2]);
-    //  sim.set_number_of_steps(nstep);  
-    //}
-  }
-  else {
-    fprintf(stderr, "Uso incorrecto de los parametros. ./nobody.x [numParticles] [hcg]\n");
-		exit(1);
-  }
   
   sim.start(Q);
 
